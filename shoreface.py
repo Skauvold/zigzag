@@ -16,7 +16,7 @@ def foreshore_profile(x):
     return np.exp(-x/rate)
 
 
-class Bedset:
+class Section:
     def __init__(self, x_left, x_right, bathymetry, dx_shoreline, dz_shoreline):
         self.x_left_ = x_left
         self.x_break_ = x_left + dx_shoreline
@@ -90,7 +90,7 @@ for n_obj_plot in range(n_obj + 1):
         plt.fill(x_lagoon, y_lagoon, "seagreen")
 
         for i in range(n_obj_plot):
-            c = Bedset(current_break_x, xmax, current_bathymetry, progradation[i], sea_level_rise[i])
+            c = Section(current_break_x, xmax, current_bathymetry, progradation[i], sea_level_rise[i])
             current_break_x += progradation[i]
             current_sea_z += sea_level_rise[i]
 
