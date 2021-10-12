@@ -1,8 +1,22 @@
 import numpy as np
-from xtgeo.surface import RegularSurface
+#from xtgeo.surface import RegularSurface
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 mpl.use("TkAgg")
+from scipy.fft import fft, ifft, fftshift, ifftshift
+
+
+def cov(x, sigma, crange, pow):
+    return sigma**2 * np.exp(-np.power(np.abs(x)/(3*crange), pow))
+
+
+def grf(xx, covfun):
+    cc = covfun(np.hstack((np.flipud(xx), xx)))
+    zz = np.random.normal(0.0, 1.0, cc.size)
+    #zz = np.hstack((zz, np.flipud(zz)))
+    u = ifft(fft(cc) * zz)
+    return np.real(u[0:xx.size])
 
 
 rate = 100.0
@@ -92,27 +106,11 @@ class Bedset3D:
 
         return xa, ya, za
 
-    def evaluate_top(self, x, y): # TODO: Improve this interpolation (remember - only need to evaluate at grid points)
+    def evaluate_top(self, x, y):
         """ Evaluate top surface at a point """
         xinc = (self.x_max_ - self.x_min_) / (self.nx_ - 1)
-        ia = int(np.floor(x / xinc))
-        ib = int(np.ceil(x / xinc))
-        if ib == ia:
-            return self.sections_[ia].get_top(y)
-        else:
-            wa = (x - ia * xinc) / xinc
-            wb = (ib * xinc - x) / xinc
-            za = self.sections_[ia].get_top(y)
-            zb = self.sections_[ib].get_top(y)
-            if za is not None and zb is not None:
-                return wa * za + wb * zb
-            elif za is None and zb is not None:
-                return zb
-            elif zb is None and za is not None:
-                return za
-            else:
-                return np.nan
-
+        i = int(np.round(x / xinc))
+        return self.sections_[i].get_top(y)
     
     def get_bottom(self):
         """ Assemble arrays of x, y and z coordinates of bottom surface """
@@ -122,7 +120,7 @@ class Bedset3D:
 # Test
 xmin, xmax = 0.0, 2000.0
 ymin, ymax = 0.0, 1000.0
-nx, ny = 80, 100
+nx, ny = 20, 60
 
 zb = np.empty(shape=(nx, ny))
 xx = np.linspace(xmin, xmax, nx)
@@ -137,36 +135,46 @@ xm, ym = np.meshgrid(xx, yy)
 xinc_grid = (xmax - xmin)/(nx-1)
 yinc_grid = (ymax - ymin)/(ny-1)
 
-dy = np.array([30.0 * np.exp(-((x - 900.0)/500.0)**2) for x in xx])
+dy0 = np.array([50.0 * np.exp(-((x - 900.0)/500.0)**2) for x in xx])
 dz = np.full(shape=(nx,), fill_value=0.01)
 y0 = np.zeros(shape=(nx,))
 
-n_bs = 10
+n_bs = 5
 
 bedsets = []
 current_bathymetry = bathy2d
 
+# surf = RegularSurface(
+#         ncol=nx, nrow=ny, xori=0.0, yori=0.0, xinc=xinc_grid, yinc=yinc_grid,
+#         rotation=0.0, values=zb, yflip=1,
+#     )
+#surf.to_file("bottom.IRAPG", "irap_ascii")
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
 for t in range(n_bs):
+    dy = dy0 * np.exp(grf(xx, lambda x: cov(x, 1.8, 25.0, 2.0)))
     bs = Bedset3D([xmin, xmax], [ymin, ymax], nx, ny, current_bathymetry, y0, (dy, dz))
     bedsets.append(bs)
     y0 += dy
     current_bathymetry = bedsets[-1].evaluate_top
     x_bs, y_bs, z_bs = bs.get_top_regular()
-    surf = RegularSurface(
-        ncol=nx, nrow=ny, xori=0.0, yori=0.0, xinc=xinc_grid, yinc=yinc_grid,
-        rotation=0.0, values=z_bs, yflip=1,
-    )
-    surf.to_file("event_{}.IRAPG".format(t), "irap_ascii")
-
-surf = RegularSurface(
-        ncol=nx, nrow=ny, xori=0.0, yori=0.0, xinc=xinc_grid, yinc=yinc_grid,
-        rotation=0.0, values=zb, yflip=1,
-    )
-surf.to_file("bottom.IRAPG", "irap_ascii")
+    #surf.values = z_bs
+    #ax.plot_surface(x_bs, y_bs, z_bs, alpha=0.5)
+    for i in range(nx):
+        ax.plot(x_bs[i, :], y_bs[i, :], z_bs[i, :], "k-", alpha=0.5)
+    #surf.to_file("event_{}.IRAPG".format(t), "irap_ascii")
 
 
+# Strike section - check interpolation behavior
+y_plot = 5*yinc_grid
+j_plot = int(np.round(y_plot / yinc_grid))
+xxf = np.linspace(xmin, xmax, 5*xx.size)
 
+fig2 = plt.figure()
+plt.plot(xxf, [bs.evaluate_top(x, y_plot) for x in xxf], "b-")
+xb, yb, zb = bs.get_top_regular()
+plt.plot(xx, zb[:, j_plot], "rs-")
 
-
-
-
+plt.show()
