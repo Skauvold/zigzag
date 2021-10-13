@@ -46,7 +46,7 @@ class Section:
         self.x_right_ = x_right
         self.bottom_ = bathymetry
         self.z_left_ = bathymetry[0]
-        self.z_right_ = bathymetry[-1] + dz_shoreline
+        self.z_right_ = bathymetry[-1] # + dz_shoreline NBNB
         self.z_break_ = bathymetry[0] + dz_shoreline
         
     def get_top(self, x):
@@ -78,7 +78,8 @@ class Bedset3D:
         for i, x in enumerate(self.strike_):
             yy = np.linspace(self.shore_[i], self.y_max_, self.ny_)
             local_bathymetry = np.array([self.bottom_(x, y) for y in yy])
-            c = Section(self.shore_[i], self.y_max_, local_bathymetry, self.delta_y_[i], self.delta_z_[i])
+            y_distal = self.shore_[i] + 0.6 * (self.y_max_ - self.y_min_)
+            c = Section(self.shore_[i], y_distal, local_bathymetry, self.delta_y_[i], self.delta_z_[i])
             self.sections_.append(c)
     
     def get_top(self):
@@ -144,7 +145,7 @@ dy0 = np.array([50.0 * np.exp(-((x - 900.0)/500.0)**2) for x in xx])
 dz = np.full(shape=(nx,), fill_value=0.01)
 y0 = np.zeros(shape=(nx,))
 
-n_bs = 10
+n_bs = 3
 
 bedsets = []
 current_bathymetry = bathy2d
