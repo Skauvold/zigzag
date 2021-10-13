@@ -1,5 +1,5 @@
 import numpy as np
-#from xtgeo.surface import RegularSurface
+from xtgeo.surface import RegularSurface
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -36,6 +36,9 @@ def foreshore_profile(x):
     return np.exp(-x/rate)
 
 
+def to_depth(z, z0=1.0):
+    return z0 - z
+
 class Section:
     def __init__(self, x_left, x_right, bathymetry, dx_shoreline, dz_shoreline):
         self.x_left_ = x_left
@@ -54,6 +57,8 @@ class Section:
             return self.z_right_ + (self.z_break_ - self.z_right_) * foreshore_profile(x - self.x_break_)
         elif x < self.x_left_:
             return self.z_left_
+        elif x > self.x_right_:
+            return self.z_right_
 
 
 class Bedset3D:
@@ -120,7 +125,7 @@ class Bedset3D:
 # Test
 xmin, xmax = 0.0, 2000.0
 ymin, ymax = 0.0, 1000.0
-nx, ny = 20, 60
+nx, ny = 60, 100
 
 zb = np.empty(shape=(nx, ny))
 xx = np.linspace(xmin, xmax, nx)
@@ -139,16 +144,16 @@ dy0 = np.array([50.0 * np.exp(-((x - 900.0)/500.0)**2) for x in xx])
 dz = np.full(shape=(nx,), fill_value=0.01)
 y0 = np.zeros(shape=(nx,))
 
-n_bs = 5
+n_bs = 10
 
 bedsets = []
 current_bathymetry = bathy2d
 
-# surf = RegularSurface(
-#         ncol=nx, nrow=ny, xori=0.0, yori=0.0, xinc=xinc_grid, yinc=yinc_grid,
-#         rotation=0.0, values=zb, yflip=1,
-#     )
-#surf.to_file("bottom.IRAPG", "irap_ascii")
+surf = RegularSurface(
+         ncol=nx, nrow=ny, xori=0.0, yori=0.0, xinc=xinc_grid, yinc=yinc_grid,
+         rotation=0.0, values=to_depth(zb), yflip=1,
+     )
+surf.to_file("bottom.IRAPG", "irap_ascii")
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
@@ -160,11 +165,11 @@ for t in range(n_bs):
     y0 += dy
     current_bathymetry = bedsets[-1].evaluate_top
     x_bs, y_bs, z_bs = bs.get_top_regular()
-    #surf.values = z_bs
+    surf.values = to_depth(z_bs)
     #ax.plot_surface(x_bs, y_bs, z_bs, alpha=0.5)
     for i in range(nx):
         ax.plot(x_bs[i, :], y_bs[i, :], z_bs[i, :], "k-", alpha=0.5)
-    #surf.to_file("event_{}.IRAPG".format(t), "irap_ascii")
+    surf.to_file("event_{}.IRAPG".format(t), "irap_ascii")
 
 
 # Strike section - check interpolation behavior
